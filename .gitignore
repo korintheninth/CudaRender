@@ -2,5 +2,6 @@ build/
 .vscode/
 *.exe
 *.obj
+*.pdb
 input/
 output/
