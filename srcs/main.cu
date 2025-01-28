@@ -1,4 +1,4 @@
-#include "libs/cudarender.h"
+#include "../libs/cudarender.h"
 
 __global__ void blur(unsigned char *image, unsigned char *result, int width, int height, int channels) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -29,7 +29,7 @@ __global__ void blur(unsigned char *image, unsigned char *result, int width, int
 int main() {
     int width, height, channels;
 
-    unsigned char *img = stbi_load("input/photo.png", &width, &height, &channels, 3);
+    unsigned char *img = stbi_load("input/image.jpg", &width, &height, &channels, 3);
     if (img == NULL) {
         std::cerr << "Error loading image" << std::endl;
         return -1;

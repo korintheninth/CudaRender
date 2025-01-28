@@ -5,3 +5,8 @@ build/
 *.pdb
 input/
 output/
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user

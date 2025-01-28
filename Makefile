@@ -9,6 +9,7 @@ CUDAFLAGS = -I$(CUDA_PATH)/include
 LDFLAGS = -L$(CUDA_PATH)/lib64
 LIBS = -lcuda -lcudart
 
+SRCDIR = srcs
 SRCS = main.cu
 
 HEADERS = libs/cudarender.h libs/stb_image.h libs/stb_image_write.h
@@ -38,11 +39,11 @@ $(TARGET_RELEASE): $(RELEASE_OBJS)
 	mkdir -p $(RELEASE_DIR)
 	$(CC) $(CFLAGS) $(CUDAFLAGS) $(RELEASE_OBJS) -o $(TARGET_RELEASE) $(LDFLAGS) $(LIBS)
 
-$(DEBUG_DIR)/%.obj: %.cu $(HEADERS)
+$(DEBUG_DIR)/%.obj: $(SRCDIR)/%.cu $(HEADERS)
 	mkdir -p $(DEBUG_DIR)
 	$(CC) $(CFLAGS) $(CUDAFLAGS) -c $< -o $@
 
-$(RELEASE_DIR)/%.obj: %.cu $(HEADERS)
+$(RELEASE_DIR)/%.obj: $(SRCDIR)/%.cu $(HEADERS)
 	mkdir -p $(RELEASE_DIR)
 	$(CC) $(CFLAGS) $(CUDAFLAGS) -c $< -o $@
 
