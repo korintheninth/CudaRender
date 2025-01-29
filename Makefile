@@ -6,13 +6,14 @@ RELEASEFLAGS =
 
 CUDA_PATH = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8"
 CUDAFLAGS = -I$(CUDA_PATH)/include
-LDFLAGS = -L$(CUDA_PATH)/lib64
-LIBS = -lcuda -lcudart
+GLFWFLAGS = -I$(GLFW_PATH)/glfw/glfw-3.3.8.bin.WIN64/include
+LDFLAGS = -L$(CUDA_PATH)/lib64 -L$(GLFW_PATH)/glfw/glfw-3.3.8.bin.WIN64/lib-vc2022
+LIBS = -lcuda -lcudart -lglfw3
 
 SRCDIR = srcs
 SRCS = main.cu
 
-HEADERS = libs/cudarender.h libs/stb_image.h libs/stb_image_write.h
+HEADERS = libs/cudarender.h libs/external/includes/GLFW/glfw3.h
 BUILD_DIR = build
 DEBUG_DIR = $(BUILD_DIR)/Debug
 

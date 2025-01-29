@@ -1,12 +1,9 @@
 build/
+logs/
+libs/
 .vscode/
 *.exe
 *.obj
 *.pdb
 input/
 output/
-.vs/
-*.sln
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
