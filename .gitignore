@@ -1,6 +1,5 @@
 build/
-logs/
-libs/
+libs/external
 .vscode/
 *.exe
 *.obj
