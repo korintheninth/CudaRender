@@ -1,6 +1,7 @@
 build/
 libs/external
 .vscode/
-*.pdb
 input/
 output/
+*.pdb
+*.dll

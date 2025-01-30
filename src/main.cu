@@ -1,13 +1,27 @@
 #include "libs/cudarender.h"
 
-__global__ void printHelloWorld()
-{
-	printf("Hello, World!\n");
-}
 
-int main(int argc, char const *argv[])
-{
-	printHelloWorld<<<1, 1>>>();
-	cudaDeviceSynchronize();
-	return 0;
+int main() {
+    GLFWwindow* window = openWindow(WIDTH, HEIGHT, "CUDA OpenGL Interop", NULL);
+    if (!window) {
+        return -1;
+    }
+
+    createPBOs();
+    
+	while (!glfwWindowShouldClose(window)) {
+        updateBuffer();
+        render();
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    for (int i = 0; i < 2; i++) {
+        cudaGraphicsUnregisterResource(cuda_pbo_resource[i]);
+        glDeleteBuffers(1, &pbo[i]);
+    }
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
+    return 0;
 }
