@@ -1,17 +1,23 @@
 #include "libs/cudarender.h"
 
+GLuint pbo[2];
+cudaGraphicsResource* cuda_pbo_resource[2]; 
+int width = 1250;
+int height = 720;
 
 int main() {
-    GLFWwindow* window = openWindow(WIDTH, HEIGHT, "CUDA OpenGL Interop", NULL);
+
+    GLFWwindow* window = openWindow(1250, 720, "CUDA OpenGL Interop", NULL);
     if (!window) {
         return -1;
     }
 
-    createPBOs();
+    createPBOs(width, height);
+    glfwSetFramebufferSizeCallback(window, updatePBOsize);
     
 	while (!glfwWindowShouldClose(window)) {
-        updateBuffer();
-        render();
+        updateBuffer(width, height);
+        render(width, height);
         glfwSwapBuffers(window);
         glfwPollEvents();
     }

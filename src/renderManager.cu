@@ -1,5 +1,10 @@
 #include "libs/cudarender.h"
 
+extern GLuint pbo[2];
+extern cudaGraphicsResource* cuda_pbo_resource[2]; 
+
+int pboIndex = 0;
+
 __global__ void fillBuffer(uchar4* buffer, int width, int height) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -10,7 +15,7 @@ __global__ void fillBuffer(uchar4* buffer, int width, int height) {
     }
 }
 
-void updateBuffer() {
+void updateBuffer(int width, int height) {
     int nextPBO = (pboIndex + 1) % 2;  // Swap buffer
     uchar4* d_buffer;
     size_t buffer_size;
@@ -19,9 +24,9 @@ void updateBuffer() {
     cudaGraphicsResourceGetMappedPointer((void**)&d_buffer, &buffer_size, cuda_pbo_resource[nextPBO]);
 
     dim3 blockSize(16, 16);
-    dim3 gridSize((WIDTH + blockSize.x - 1) / blockSize.x,
-                  (HEIGHT + blockSize.y - 1) / blockSize.y);
-    fillBuffer<<<gridSize, blockSize>>>(d_buffer, WIDTH, HEIGHT);
+    dim3 gridSize((width + blockSize.x - 1) / blockSize.x,
+                  (height + blockSize.y - 1) / blockSize.y);
+    fillBuffer<<<gridSize, blockSize>>>(d_buffer, width, height);
     cudaDeviceSynchronize();
     
 	cudaError_t err = cudaDeviceSynchronize();
@@ -35,10 +40,10 @@ void updateBuffer() {
     pboIndex = nextPBO;
 }
 
-void render() {
+void render(int width, int height) {
     glClear(GL_COLOR_BUFFER_BIT);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo[pboIndex]);
-    glDrawPixels(WIDTH, HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glDrawPixels(width, height, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 
     GLenum err = glGetError();
     if (err != GL_NO_ERROR) {
