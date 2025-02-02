@@ -6,20 +6,17 @@ int width = 1250;
 int height = 720;
 
 int main() {
-
     GLFWwindow* window = openWindow(1250, 720, "CUDA OpenGL Interop", NULL);
     if (!window) {
         return -1;
     }
 
     createPBOs(width, height);
-    glfwSetFramebufferSizeCallback(window, updatePBOsize);
+    glfwSetFramebufferSizeCallback(window, updateBuffersize);
     
 	while (!glfwWindowShouldClose(window)) {
-        updateBuffer(width, height);
-        render(width, height);
-        glfwSwapBuffers(window);
         glfwPollEvents();
+        updateContent(width, height, window);
     }
 
     for (int i = 0; i < 2; i++) {

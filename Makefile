@@ -1,6 +1,6 @@
 CC = nvcc
 
-CFLAGS = -arch=sm_86 -I. -Xcompiler \"/MD\"
+CFLAGS = -rdc=true -arch=sm_86 -I. -Xcompiler \"/MD\" --cudart=shared
 DEBUGFLAGS = -g -G
 RELEASEFLAGS = -O3
 
@@ -10,10 +10,10 @@ GLEWFLAGS = -I$(GLEWDIR)/include -L$(GLEWDIR)/lib/Release/x64
 GLFWDIR = libs/external/glfw/glfw-3.3.8.bin.WIN64
 GLFWFLAGS = -I$(GLFWDIR)/include -L$(GLFWDIR)/lib-vc2022
 
-LIBS = -lcuda -lcudart -lglew32 -lglfw3 -lopengl32 -lgdi32 -luser32 -lshell32 -lmsvcrt -lvcruntime -lucrt
+LIBS = -lcuda -lcudart -lcublas -lglew32 -lglfw3 -lopengl32 -lgdi32 -luser32 -lshell32
 
 SRCDIR = src
-SRCS = main.cu windowManager.cu renderManager.cu utils.cu
+SRCS = main.cu windowManager.cu renderManager.cu utils.cu render.cu
 
 HEADERS = libs/cudarender.h
 

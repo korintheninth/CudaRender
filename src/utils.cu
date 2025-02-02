@@ -15,10 +15,17 @@ void createPBOs(int width, int height) {
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
-void updatePBOsize(GLFWwindow *window, int newwidth, int newheight) {
-	width = newwidth;
-	height = newheight;
-	cudaGraphicsUnregisterResource(cuda_pbo_resource[0]);
-	cudaGraphicsUnregisterResource(cuda_pbo_resource[1]);
-	createPBOs(width, height);
+void updateBuffersize(GLFWwindow *window, int newwidth, int newheight) {
+    width = newwidth;
+    height = newheight;
+
+    for (int i = 0; i < 2; i++) {
+        cudaError_t err = cudaGraphicsUnregisterResource(cuda_pbo_resource[i]);
+        if (err != cudaSuccess) {
+            std::cerr << "CUDA Error (Unregistering PBO): " << cudaGetErrorString(err) << std::endl;
+        }
+    }
+    createPBOs(width, height);
+    updateContent(width, height, window);
 }
+
