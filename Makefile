@@ -10,7 +10,13 @@ GLEWFLAGS = -I$(GLEWDIR)/include -L$(GLEWDIR)/lib/Release/x64
 GLFWDIR = libs/external/glfw/glfw-3.3.8.bin.WIN64
 GLFWFLAGS = -I$(GLFWDIR)/include -L$(GLFWDIR)/lib-vc2022
 
-LIBS = -lcuda -lcudart -lcublas -lglew32 -lglfw3 -lopengl32 -lgdi32 -luser32 -lshell32
+ASSIMPDIR = libs/external/assimp
+ASSIMPFLAGS = -I$(ASSIMPDIR)/include -L$(ASSIMPDIR)/lib/x64
+
+RELEASETOTALFLAGS = $(CFLAGS) $(RELEASEFLAGS) $(GLFWFLAGS) $(GLEWFLAGS) $(ASSIMPFLAGS)
+DEBUGTOTALFLAGS = $(CFLAGS) $(DEBUGFLAGS) $(GLFWFLAGS) $(GLEWFLAGS) $(ASSIMPFLAGS)
+
+LIBS = -lcuda -lcudart -lglew32 -lglfw3 -lopengl32 -lgdi32 -luser32 -lshell32 -lassimp
 
 SRCDIR = src
 SRCS = main.cu windowManager.cu renderManager.cu utils.cu render.cu
@@ -37,19 +43,19 @@ release: $(TARGET_RELEASE)
 
 $(TARGET_DEBUG): $(DEBUG_OBJS)
 	mkdir -p $(DEBUG_DIR)
-	$(CC) $(CFLAGS) $(GLFWFLAGS) $(GLEWFLAGS) -o $(TARGET_DEBUG) $(DEBUG_OBJS) $(LDFLAGS) $(LIBS)
+	$(CC) $(DEBUGTOTALFLAGS)  -o $(TARGET_DEBUG) $(DEBUG_OBJS) $(LDFLAGS) $(LIBS)
 
 $(TARGET_RELEASE): $(RELEASE_OBJS)
 	mkdir -p $(RELEASE_DIR)
-	$(CC) $(CFLAGS) $(GLFWFLAGS) $(GLEWFLAGS) -o $(TARGET_RELEASE) $(RELEASE_OBJS) $(LDFLAGS) $(LIBS)
+	$(CC) $(RELEASETOTALFLAGS) -o $(TARGET_RELEASE) $(RELEASE_OBJS) $(LDFLAGS) $(LIBS)
 
 $(DEBUG_DIR)/%.obj: $(SRCDIR)/%.cu $(HEADERS)
 	mkdir -p $(DEBUG_DIR)
-	$(CC) $(CFLAGS) $(GLFWFLAGS) $(GLEWFLAGS) -c $< -o $@
+	$(CC) $(DEBUGTOTALFLAGS) -c $< -o $@
 
 $(RELEASE_DIR)/%.obj: $(SRCDIR)/%.cu $(HEADERS)
 	mkdir -p $(RELEASE_DIR)
-	$(CC) $(CFLAGS) $(GLFWFLAGS) $(GLEWFLAGS) -c $< -o $@
+	$(CC) $(RELEASETOTALFLAGS) -c $< -o $@
 
 clean:
 	rm -f *.pdb

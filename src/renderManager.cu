@@ -2,6 +2,10 @@
 
 extern GLuint pbo[2];
 extern cudaGraphicsResource* cuda_pbo_resource[2]; 
+extern float3 *d_vertices;
+extern int *d_indices;
+extern int numTriangles;
+extern float *depthBuffer;
 
 int pboIndex = 0;
 
@@ -13,10 +17,9 @@ void updateBuffer(int width, int height) {
     cudaGraphicsMapResources(1, &cuda_pbo_resource[nextPBO]);
     cudaGraphicsResourceGetMappedPointer((void**)&d_buffer, &buffer_size, cuda_pbo_resource[nextPBO]);
 
-    render(d_buffer, width, height);
-    cudaDeviceSynchronize();
-    
-	cudaError_t err = cudaDeviceSynchronize();
+    render(d_buffer, width, height, d_vertices, d_indices, numTriangles, depthBuffer);
+	
+    cudaError_t err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
         std::cerr << "CUDA Error: " << cudaGetErrorString(err) << std::endl;
     }
@@ -37,6 +40,8 @@ void writeToWindow(int width, int height) {
 }
 
 void updateContent(int width, int height, GLFWwindow* window) {
+    if (width == 0 || height == 0)
+        return;
     updateBuffer(width, height);
     writeToWindow(width, height);
     glfwSwapBuffers(window);
