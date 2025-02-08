@@ -1,7 +1,7 @@
 #include "libs/cudarender.h"
 
 
-__global__ void castTriangles(int width, int height, float3 *vertices, int *indices, int numTriangles, triangle *triangles) {
+__global__ void castTriangles(int width, int height, float3 *vertices, int *indices, int numTriangles, triangle *triangles, controls camera) {
     int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (globalIdx >= numTriangles)
@@ -9,9 +9,9 @@ __global__ void castTriangles(int width, int height, float3 *vertices, int *indi
 
     float3 position = {0.0f, 0.0f, 10.0f};
 
-    float3 a = modelToWorld(vertices[indices[globalIdx * 3]], position, width, height);
-    float3 b = modelToWorld(vertices[indices[globalIdx * 3 + 1]], position, width, height);
-    float3 c = modelToWorld(vertices[indices[globalIdx * 3 + 2]], position, width, height);
+    float3 a = modelToWorld(vertices[indices[globalIdx * 3]], position, camera.rotation);
+    float3 b = modelToWorld(vertices[indices[globalIdx * 3 + 1]], position, camera.rotation);
+    float3 c = modelToWorld(vertices[indices[globalIdx * 3 + 2]], position, camera.rotation);
     float3 normal = calculateSurfaceNormal(a, b, c);
 
     float a4[4] = {a.x, a.y, a.z, 1};
@@ -20,7 +20,11 @@ __global__ void castTriangles(int width, int height, float3 *vertices, int *indi
 
     float a4p[4], b4p[4], c4p[4];
     float projection[4][4];
-    projectionMatrix(90.0f, (float)width / (float)height, 0.1f, 100.0f, projection);
+    //float rotation[4][4];
+    //float result[4][4];
+    projectionMatrix(100.0f, (float)width / (float)height, 0.1f, 100.0f, projection);
+    //rotationMatrix(camera.rotation, rotation);
+    //matMult(rotation, projection, result);
     matVecMult(projection, a4, a4p);
     matVecMult(projection, b4, b4p);
     matVecMult(projection, c4, c4p);
@@ -120,11 +124,7 @@ __global__ void renderTile(int width, int height, tile *tiles, uchar4 *buffer, f
 	}
 }
 
-void newRender(uchar4 *d_buffer, int width, int height, float3 *d_vertices, int *d_indices,
-		int numTriangles, float *depthBuffer, triangle *d_triangles, tile *d_tiles) {
-	int const tsizesq = TILE_SIZE * TILE_SIZE;
-    int threadCount = min(256, numTriangles);
-    int blockCount = max(1, (numTriangles + 255) / 256);
+void newRender(uchar4 *d_buffer, int width, int height, triangleData data, triangle *d_triangles, tile *d_tiles, controls camera) {
     int numPixels = width * height;
 
     int tilesWidth = (width + TILE_SIZE - 1) / TILE_SIZE;
@@ -133,20 +133,25 @@ void newRender(uchar4 *d_buffer, int width, int height, float3 *d_vertices, int 
     int tileThreads = min(256, numTiles);
     int tileBlocks = max(1, (numTiles + 255) / 256);
 
+    dim3 bufferBlockSize(16, 16);
+    dim3 bufferGridSize((width + 15) / 16, (height + 15) / 16);
+
+    clearBuffer<<<bufferGridSize, bufferBlockSize>>>(d_buffer, width, height);
+
     initTiles<<<tileBlocks, tileThreads>>>(width, height, d_tiles);
-    initBuffer<<<(numPixels + 255)/256, 256>>>(depthBuffer, numPixels, 100.0f);
+    initBuffer<<<(numPixels + 255)/256, 256>>>(data.depthBuffer, numPixels, 100.0f);
     cudaDeviceSynchronize();
     
-	castTriangles<<<blockCount, threadCount>>>(width, height, d_vertices, d_indices, numTriangles, d_triangles);
+	castTriangles<<<max(1, (data.numTriangles + 255) / 256), min(256, data.numTriangles)>>>(width, height, data.vertices, data.indices, data.numTriangles, d_triangles, camera);
     cudaDeviceSynchronize();
     
-	assignToTiles<<<blockCount, threadCount>>>(width, height, numTriangles, d_triangles, d_tiles);
+	assignToTiles<<<max(1, (data.numTriangles + 255) / 256), min(256, data.numTriangles)>>>(width, height, data.numTriangles, d_triangles, d_tiles);
     cudaDeviceSynchronize();
 	
 	dim3 renderBlockSize(TILE_SIZE, TILE_SIZE);
 	dim3 renderGridSize((width + TILE_SIZE - 1) / TILE_SIZE, (height + TILE_SIZE - 1) / TILE_SIZE);
 	
-	renderTile<<<renderGridSize, renderBlockSize>>>(width, height, d_tiles, d_buffer, depthBuffer, d_triangles);
+	renderTile<<<renderGridSize, renderBlockSize>>>(width, height, d_tiles, d_buffer, data.depthBuffer, d_triangles);
 	cudaDeviceSynchronize();
 	
 	cudaError_t error = cudaGetLastError();

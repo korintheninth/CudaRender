@@ -4,7 +4,8 @@ extern GLuint pbo[2];
 extern cudaGraphicsResource* cuda_pbo_resource[2];
 extern int width;
 extern int height;
-extern float *depthBuffer;
+extern triangleData data;
+extern controls camera;
 
 void createPBOs(int width, int height) {
     glGenBuffers(2, pbo);
@@ -21,8 +22,8 @@ void updateBuffersize(GLFWwindow *window, int newwidth, int newheight) {
         return;
     width = newwidth;
     height = newheight;
-    cudaFree(depthBuffer);
-    cudaMalloc(&depthBuffer, width * height * sizeof(float));
+    cudaFree(data.depthBuffer);
+    cudaMalloc(&data.depthBuffer, width * height * sizeof(float));
 
     for (int i = 0; i < 2; i++) {
         cudaError_t err = cudaGraphicsUnregisterResource(cuda_pbo_resource[i]);
@@ -64,3 +65,18 @@ bool LoadModel(const std::string& fileDir, std::vector<int>& indices, std::vecto
     return true;
 }
 
+void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
+    if (camera.mouseLeft) {
+        camera.rotation.x += (ypos - camera.lastMousePos.y) * 0.001f;
+        camera.rotation.y -= (xpos - camera.lastMousePos.x) * 0.001f;
+    }
+    camera.lastMousePos = {(float)xpos, (float)ypos};
+}
+
+void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        camera.mouseLeft = true;
+    } else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+        camera.mouseLeft = false;
+    }
+}

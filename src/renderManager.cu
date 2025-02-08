@@ -2,12 +2,8 @@
 
 extern GLuint pbo[2];
 extern cudaGraphicsResource* cuda_pbo_resource[2]; 
-extern float3 *d_vertices;
-extern int *d_indices;
-extern int numTriangles;
-extern float *depthBuffer;
-extern float3 *d_screenVertices;
-extern float3 *d_normals;
+extern triangleData data;
+extern controls camera;
 
 extern triangle *d_triangles;
 extern tile *d_tiles;
@@ -22,7 +18,7 @@ void updateBuffer(int width, int height) {
     cudaGraphicsMapResources(1, &cuda_pbo_resource[nextPBO]);
     cudaGraphicsResourceGetMappedPointer((void**)&d_buffer, &buffer_size, cuda_pbo_resource[nextPBO]);
 
-    newRender(d_buffer, width, height, d_vertices, d_indices, numTriangles, depthBuffer, d_triangles, d_tiles);
+    newRender(d_buffer, width, height, data, d_triangles, d_tiles, camera);
 
 	
     cudaError_t err = cudaDeviceSynchronize();

@@ -23,6 +23,17 @@ __device__ void matMult(float mat1[4][4], float mat2[4][4], float result[4][4]) 
     }
 }
 
+__device__ void matMult3x3(float mat1[3][3], float mat2[3][3], float result[3][3]) {
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            result[i][j] = 0.0f;
+            for (int k = 0; k < 3; k++) {
+                result[i][j] += mat1[i][k] * mat2[k][j];
+            }
+        }
+    }
+}
+
 __device__ void matVecMult(float mat[4][4], float vec[4], float result[4]) {
     for (int i = 0; i < 4; i++) {
         result[i] = 0.0f;
@@ -30,15 +41,6 @@ __device__ void matVecMult(float mat[4][4], float vec[4], float result[4]) {
             result[i] += mat[i][j] * vec[j];
         }
     }
-}
-
-__device__ float3 modelToWorld(float3 model, float3 position, int width, int height) {
-    float3 world;
-
-    world.x = model.x + position.x;
-    world.y = model.y + position.y;
-    world.z = model.z + position.z;
-    return world;
 }
 
 __device__ void projectionMatrix(float fov, float aspect, float near, float far, float mat[4][4]) {
@@ -50,6 +52,64 @@ __device__ void projectionMatrix(float fov, float aspect, float near, float far,
     mat[2][0] = 0.0f;      mat[2][1] = 0.0f; mat[2][2] = clip1; mat[2][3] = -1.0f;
     mat[3][0] = 0.0f;      mat[3][1] = 0.0f; mat[3][2] = clip2; mat[3][3] = 0.0f;
 }
+
+__device__ void rotationMatrix(float3 rotation, float mat[4][4]) {
+    float x = rotation.x * (CUDART_PI / 180.0f);
+    float y = rotation.y * (CUDART_PI / 180.0f);
+    float z = rotation.z * (CUDART_PI / 180.0f);
+
+    float a = cos(x);
+    float b = sin(x);
+    float c = cos(y);
+    float d = sin(y);
+    float e = cos(z);
+    float f = sin(z);
+
+    mat[0][0] = c * e; mat[0][1] = -c * f; mat[0][2] = d; mat[0][3] = 0.0f;
+    mat[1][0] = b * d * e + a * f; mat[1][1] = -b * d * f + a * e; mat[1][2] = -b * c; mat[1][3] = 0.0f;
+    mat[2][0] = -a * d * e + b * f; mat[2][1] = a * d * f + b * e; mat[2][2] = a * c; mat[2][3] = 0.0f;
+    mat[3][0] = 0.0f; mat[3][1] = 0.0f; mat[3][2] = 0.0f; mat[3][3] = 1.0f;
+}
+__device__ float3 modelToWorld(float3 model, float3 position, float3 rotation) {
+    float cosX = cos(rotation.x), sinX = sin(rotation.x);
+    float cosY = cos(rotation.y), sinY = sin(rotation.y);
+    float cosZ = cos(rotation.z), sinZ = sin(rotation.z);
+
+    // Rotation matrices
+    float rotationX[3][3] = {
+        {1, 0, 0},
+        {0, cosX, -sinX},
+        {0, sinX, cosX}
+    };
+
+    float rotationY[3][3] = {
+        {cosY, 0, sinY},
+        {0, 1, 0},
+        {-sinY, 0, cosY}
+    };
+
+    float rotationZ[3][3] = {
+        {cosZ, -sinZ, 0},
+        {sinZ, cosZ, 0},
+        {0, 0, 1}
+    };
+
+    // Combined rotation: Rz * Ry * Rx
+    float rotationZY[3][3], rotationFinal[3][3];
+    matMult3x3(rotationZ, rotationY, rotationZY);
+    matMult3x3(rotationZY, rotationX, rotationFinal);
+
+    // Apply rotation
+    float3 rotated = {
+        rotationFinal[0][0] * model.x + rotationFinal[0][1] * model.y + rotationFinal[0][2] * model.z,
+        rotationFinal[1][0] * model.x + rotationFinal[1][1] * model.y + rotationFinal[1][2] * model.z,
+        rotationFinal[2][0] * model.x + rotationFinal[2][1] * model.y + rotationFinal[2][2] * model.z
+    };
+
+    // Apply translation
+    return {rotated.x + position.x, rotated.y + position.y, rotated.z + position.z};
+}
+
 
 __device__ float3 viewportTransformation(float3 world, int width, int height) {
     float3 screen;
@@ -136,6 +196,17 @@ __global__ void initTiles(int width, int height, tile *tiles) {
     if (idx < tilesWidth * tilesHeight) {
         tiles[idx].numTriangles = 0;
     }
+}
+
+__global__ void clearBuffer(uchar4 *buffer, int width, int height) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (x >= width || y >= height)
+        return;
+
+    int idx = y * width + x;
+    buffer[idx] = {0, 0, 0, 255};
 }
 
 __device__ float3 normalize(float3 v) {
