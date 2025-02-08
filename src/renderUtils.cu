@@ -75,7 +75,6 @@ __device__ float3 modelToWorld(float3 model, float3 position, float3 rotation) {
     float cosY = cos(rotation.y), sinY = sin(rotation.y);
     float cosZ = cos(rotation.z), sinZ = sin(rotation.z);
 
-    // Rotation matrices
     float rotationX[3][3] = {
         {1, 0, 0},
         {0, cosX, -sinX},
@@ -94,19 +93,16 @@ __device__ float3 modelToWorld(float3 model, float3 position, float3 rotation) {
         {0, 0, 1}
     };
 
-    // Combined rotation: Rz * Ry * Rx
     float rotationZY[3][3], rotationFinal[3][3];
     matMult3x3(rotationZ, rotationY, rotationZY);
     matMult3x3(rotationZY, rotationX, rotationFinal);
 
-    // Apply rotation
     float3 rotated = {
         rotationFinal[0][0] * model.x + rotationFinal[0][1] * model.y + rotationFinal[0][2] * model.z,
         rotationFinal[1][0] * model.x + rotationFinal[1][1] * model.y + rotationFinal[1][2] * model.z,
         rotationFinal[2][0] * model.x + rotationFinal[2][1] * model.y + rotationFinal[2][2] * model.z
     };
 
-    // Apply translation
     return {rotated.x + position.x, rotated.y + position.y, rotated.z + position.z};
 }
 
