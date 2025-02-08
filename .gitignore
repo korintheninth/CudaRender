@@ -3,6 +3,5 @@ libs/external
 .vscode/
 input/
 output/
-objs/
 *.pdb
 *.dll

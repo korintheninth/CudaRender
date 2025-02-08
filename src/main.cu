@@ -39,7 +39,7 @@ int main() {
     int numVertices;
     int numIndices;
 
-    if (!LoadModel("objs/monkey.obj", indices, vertices, &numIndices, &numVertices)) {
+    if (!LoadModel("objs/sphere.obj", indices, vertices, &numIndices, &numVertices)) {
         return -1;
     }
     data.numTriangles = numIndices / 3;
