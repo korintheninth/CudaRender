@@ -1,118 +1,89 @@
 #include "libs/cudarender.h"
 #define BLOCK_SIZE 256
 
-__device__ float atomicMinFloat(float* address, float val);
-__device__ void matMult(float mat1[4][4], float mat2[4][4], float result[4][4]);
-__device__ void matVecMult(float mat[4][4], float vec[4], float result[4]);
-__device__ float3 modelToWorld(float3 model, float3 position, int width, int height);
-__device__ void projectionMatrix(float fov, float aspect, float near, float far, float mat[4][4]);
-__device__ float3 viewportTransformation(float3 world, int width, int height);
 __global__ void fill(int xmin, int xmax, int ymin, int ymax, float3 a, float3 b, float3 c, float3 normal, uchar4* buffer, int width, int height, float *depthBuffer);
-__global__ void fillBuffer(uchar4* buffer, int width, int height, float3 *vertices, int *indices, float *depthBuffer, int numIndices);
-__device__ float pointDepth(float3 a, float3 b, float3 c, int x, int y);
-__global__ void initDepthBuffer(float *depthBuffer, int size, float value);
-//__device__ void connectVertices(int x1, int y1, int x2, int y2, uchar4* buffer, int width, int height);
-void render(uchar4 *d_buffer, int width, int height);
+__device__ void connectVertices(int x1, int y1, int x2, int y2, uchar4* buffer, int width, int height);
 
-__device__ float atomicMinFloat(float* address, float val) {
-    int* address_as_int = (int*)address;
-    int old = *address_as_int, assumed;
 
-    do {
-        assumed = old;
-        old = atomicCAS(address_as_int, assumed, __float_as_int(fminf(val, __int_as_float(assumed))));
-    } while (assumed != old);
-
-    return __int_as_float(old);
-}
-
-__device__ void matMult(float mat1[4][4], float mat2[4][4], float result[4][4]) {
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            result[i][j] = 0.0f;
-            for (int k = 0; k < 4; k++) {
-                result[i][j] += mat1[i][k] * mat2[k][j];
-            }
-        }
-    }
-}
-
-__device__ void matVecMult(float mat[4][4], float vec[4], float result[4]) {
-    for (int i = 0; i < 4; i++) {
-        result[i] = 0.0f;
-        for (int j = 0; j < 4; j++) {
-            result[i] += mat[i][j] * vec[j];
-        }
-    }
-}
-
-__device__ float3 modelToWorld(float3 model, float3 position, int width, int height) {
-    float3 world;
-
-    world.x = model.x + position.x;
-    world.y = model.y + position.y;
-    world.z = model.z + position.z;
-    return world;
-}
-
-__device__ void projectionMatrix(float fov, float aspect, float near, float far, float mat[4][4]) {
-    float s = 1.0f / tan((fov / 2.0f) * (CUDART_PI / 180.0f));
-    float clip1 = -far/(far - near);
-    float clip2 = -(far * near)/(far - near);
-    mat[0][0] = s / aspect; mat[0][1] = 0.0f; mat[0][2] = 0.0f;  mat[0][3] = 0.0f;
-    mat[1][0] = 0.0f;      mat[1][1] = s;    mat[1][2] = 0.0f;  mat[1][3] = 0.0f;
-    mat[2][0] = 0.0f;      mat[2][1] = 0.0f; mat[2][2] = clip1; mat[2][3] = -1.0f;
-    mat[3][0] = 0.0f;      mat[3][1] = 0.0f; mat[3][2] = clip2; mat[3][3] = 0.0f;
-}
-
-__device__ float3 viewportTransformation(float3 world, int width, int height) {
-    float3 screen;
-    screen.x = (world.x + 1.0f) * width / 2.0f;
-    screen.y = (world.y + 1.0f) * height / 2.0f;
-    screen.z = world.z;
-    return screen;
-}
-
-__device__ float pointDepth(float3 a, float3 b, float3 c, int x, int y) {
-    float3 ab = {b.x - a.x, b.y - a.y, b.z - a.z};
-    float3 ac = {c.x - a.x, c.y - a.y, c.z - a.z};
-    float3 bc = {c.x - b.x, c.y - b.y, c.z - b.z};
-    float3 bp = {x - b.x, y - b.y, 0};
-    float3 cp = {x - c.x, y - c.y, 0};
-
-    float areaABC = 0.5f * (ab.x * ac.y - ab.y * ac.x);
-    if (areaABC == 0)
-        return 100.0f;
-    float alpha = 0.5f * (bc.x * cp.y - bc.y * cp.x) / areaABC;
-    float beta = 0.5f * (ac.x * bp.y - ac.y * bp.x) / areaABC;
-    float gamma = 1.0f - alpha - beta;
-
-    return alpha * a.z + beta * b.z + gamma * c.z;
-}
-
-__device__ float3 calculateSurfaceNormal(float3 a, float3 b, float3 c) {
-    float3 ab = {b.x - a.x, b.y - a.y, b.z - a.z};
-    float3 ac = {c.x - a.x, c.y - a.y, c.z - a.z};
-
-    float3 normal = {ab.y * ac.z - ab.z * ac.y, 
-                     ab.z * ac.x - ab.x * ac.z, 
-                     ab.x * ac.y - ab.y * ac.x};
-
-    float length = sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+__global__ void getFragments(int xmin, int xmax, int ymin, int ymax, float edge0, float edge1, float edge2,
+    float dedgex0, float dedgey0, float dedgex1, float dedgey1, float dedgex2, float dedgey2,
+    float3 a, float3 b, float3 c, float *depthBuffer, int width, int height, uchar4 *buffer, float3 normal) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
     
-    if (length > 0.0f) {
-        normal.x /= length;
-        normal.y /= length;
-        normal.z /= length;
-    }
+    int x = xmin + idx;
+    int y = ymin + idy;
+    if (x > xmax || y > ymax)
+        return;
+    
+    float depth = pointDepth(a, b, c, x, y);
+    if (depth < 0.0f)
+        return;
+    if (depth > depthBuffer[y * width + x])
+        return;
+    
+    float edge0p = edge0 + dedgex0 * idx + dedgey0 * idy;
+    float edge1p = edge1 + dedgex1 * idx + dedgey1 * idy;
+    float edge2p = edge2 + dedgex2 * idx + dedgey2 * idy;
 
-    return normal;
+    if (edge0p <= 0 && edge1p <= 0 && edge2p <= 0) {
+        atomicMinFloat(&depthBuffer[y * width + x], depth);
+        float3 lightColor = {255.0f, 255.0f, 255.0f};
+        float cost = -normal.z;
+        if (cost < 0)
+            cost = 0;
+        buffer[y * width + x] = make_uchar4(lightColor.x * cost, lightColor.y * cost, lightColor.z * cost, 255);
+    }
 }
 
-__global__ void fillBuffer(uchar4* buffer, int width, int height, float3 *vertices, int *indices, float *depthBuffer, int numIndices) {
+__global__ void rasteriseTriangle(float3 *vertices, int *indices, float *depthBuffer, int width, int height, uchar4 *buffer, int numTriangles, float3 *normals) {
     int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (globalIdx >= numIndices)
+    if (globalIdx >= numTriangles)
+        return;
+
+    float3 a = vertices[indices[globalIdx * 3]];
+    float3 b = vertices[indices[globalIdx * 3 + 1]];
+    float3 c = vertices[indices[globalIdx * 3 + 2]];
+
+    int xmin = max(0, (int)floorf(fminf(a.x, fminf(b.x, c.x))));
+    int xmax = min(width - 1, (int)ceilf(fmaxf(a.x, fmaxf(b.x, c.x))));
+    int ymin = max(0, (int)floorf(fminf(a.y, fminf(b.y, c.y))));
+    int ymax = min(height - 1, (int)ceilf(fmaxf(a.y, fmaxf(b.y, c.y))));
+    
+
+    int xrange = xmax - xmin + 1;
+    int yrange = ymax - ymin + 1;
+
+    float edge0 = edgeFunction(b, c, xmin, ymin);
+    float edge1 = edgeFunction(c, a, xmin, ymin);
+    float edge2 = edgeFunction(a, b, xmin, ymin);
+
+
+    float dedgex0 = c.y - b.y; float dedgey0 = b.x - c.x;
+    float dedgex1 = a.y - c.y; float dedgey1 = c.x - a.x;
+    float dedgex2 = b.y - a.y; float dedgey2 = a.x - b.x;
+
+    float3 normal = normals[globalIdx];
+
+    
+    int threadx = min(16, xrange);
+    int thready = min(16, yrange);
+
+    int blockx = max(1, (xrange + 15) / 16);
+    int blocky = max(1, (yrange + 15) / 16);
+
+    dim3 threads(threadx, thready);
+    dim3 blocks(blockx, blocky);
+
+    getFragments<<<blocks, threads>>>(xmin, xmax, ymin, ymax, edge0, edge1, edge2, dedgex0, dedgey0, dedgex1, dedgey1, dedgex2, dedgey2,
+         a, b, c, depthBuffer, width, height, buffer, normal);
+}
+
+__global__ void fillBuffer(int width, int height, float3 *vertices, int *indices, int numTriangles, float3 *screenVertices, float3 *normals) {
+    int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (globalIdx >= numTriangles)
         return;
 
     float3 position = {0.0f, 0.0f, 40.0f};
@@ -120,7 +91,9 @@ __global__ void fillBuffer(uchar4* buffer, int width, int height, float3 *vertic
     float3 a = modelToWorld(vertices[indices[globalIdx * 3]], position, width, height);
     float3 b = modelToWorld(vertices[indices[globalIdx * 3 + 1]], position, width, height);
     float3 c = modelToWorld(vertices[indices[globalIdx * 3 + 2]], position, width, height);
+
     float3 normal = calculateSurfaceNormal(a, b, c);
+    normals[globalIdx] = normal;
 
     float a4[4] = {a.x, a.y, a.z, 1};
     float b4[4] = {b.x, b.y, b.z, 1};
@@ -150,18 +123,24 @@ __global__ void fillBuffer(uchar4* buffer, int width, int height, float3 *vertic
     b = viewportTransformation(b, width, height);
     c = viewportTransformation(c, width, height);
 
-    int xmin = max(0, (int)floorf(min(a.x, min(b.x, c.x))));
-    int xmax = min(width - 1, (int)ceilf(max(a.x, max(b.x, c.x))));
-    int ymin = max(0, (int)floorf(min(a.y, min(b.y, c.y))));
-    int ymax = min(height - 1, (int)ceilf(max(a.y, max(b.y, c.y))));
+    screenVertices[indices[globalIdx * 3]] = a;
+    screenVertices[indices[globalIdx * 3 + 1]] = b;
+    screenVertices[indices[globalIdx * 3 + 2]] = c;
 
+    //connectVertices(a.x, a.y, b.x, b.y, buffer, width, height);
 
-    int xrange = xmax - xmin + 1;
-    int yrange = ymax - ymin + 1;
-    int threadCount = min(BLOCK_SIZE, xrange * yrange);
-    int blockCount = max(1 ,((xrange * yrange) + BLOCK_SIZE - 1) / BLOCK_SIZE);
-    
-    fill<<<blockCount, threadCount>>>(xmin, xmax, ymin, ymax, a, b, c, normal, buffer, width, height, depthBuffer);
+    //int xmin = max(0, (int)floorf(min(a.x, min(b.x, c.x))));
+    //int xmax = min(width - 1, (int)ceilf(max(a.x, max(b.x, c.x))));
+    //int ymin = max(0, (int)floorf(min(a.y, min(b.y, c.y))));
+    //int ymax = min(height - 1, (int)ceilf(max(a.y, max(b.y, c.y))));
+//
+//
+    //int xrange = xmax - xmin + 1;
+    //int yrange = ymax - ymin + 1;
+    //int threadCount = min(BLOCK_SIZE, xrange * yrange);
+    //int blockCount = max(1 ,((xrange * yrange) + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    //
+    //fill<<<blockCount, threadCount>>>(xmin, xmax, ymin, ymax, a, b, c, normal, buffer, width, height, depthBuffer);
 }
 
 __global__ void fill(int xmin, int xmax, int ymin, int ymax, float3 a, float3 b, float3 c, float3 normal, uchar4* buffer, int width, int height, float *depthBuffer) {
@@ -198,20 +177,17 @@ __global__ void fill(int xmin, int xmax, int ymin, int ymax, float3 a, float3 b,
         }
 }
 
-__global__ void initDepthBuffer(float *depthBuffer, int size, float value) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < size) {
-        depthBuffer[idx] = value;
-    }
-}
-void render(uchar4 *d_buffer, int width, int height, float3 *d_vertices, int *d_indices, int numIndices, float *depthBuffer) {
-    int threadCount = min(BLOCK_SIZE, numIndices);
-    int blockCount = max(1, (numIndices + BLOCK_SIZE - 1) / BLOCK_SIZE);
+void render(uchar4 *d_buffer, int width, int height, float3 *d_vertices, int *d_indices, int numTriangles, float *depthBuffer, float3 *d_screenVertices, float3 *d_normals) {
+    int threadCount = min(BLOCK_SIZE, numTriangles);
+    int blockCount = max(1, (numTriangles + BLOCK_SIZE - 1) / BLOCK_SIZE);
     int numPixels = width * height;
 
-    initDepthBuffer<<<(numPixels + 255)/256, 256>>>(depthBuffer, numPixels, 100.0f);
     cudaDeviceSynchronize();
-    fillBuffer<<<blockCount, threadCount>>>(d_buffer, width, height, d_vertices, d_indices, depthBuffer, numIndices);
+    initBuffer<<<(numPixels + 255)/256, 256>>>(depthBuffer, numPixels, 100.0f);
+    cudaDeviceSynchronize();
+    fillBuffer<<<blockCount, threadCount>>>(width, height, d_vertices, d_indices, numTriangles, d_screenVertices, d_normals);
+    cudaDeviceSynchronize();
+    rasteriseTriangle<<<blockCount, threadCount>>>(d_screenVertices, d_indices, depthBuffer, width, height, d_buffer, numTriangles, d_normals);
     cudaDeviceSynchronize();
     cudaGetLastError();
     cudaError_t error = cudaGetLastError();
@@ -221,21 +197,21 @@ void render(uchar4 *d_buffer, int width, int height, float3 *d_vertices, int *d_
     }
 }
 
-//__device__ void connectVertices(int x1, int y1, int x2, int y2, uchar4* buffer, int width, int height) {
-//    int dx = abs(x2 - x1), dy = abs(y2 - y1);
-//    int sx = (x1 < x2) ? 1 : -1;
-//    int sy = (y1 < y2) ? 1 : -1;
-//    int err = dx - dy;
-//
-//    while (true) {
-//        int index = y1 * width + x1;
-//        if (index >= 0 && index < width * height)
-//            buffer[index] = make_uchar4(255, 255, 255, 255);
-//
-//        if (x1 == x2 && y1 == y2) break;
-//
-//        int e2 = 2 * err;
-//        if (e2 > -dy) { err -= dy; x1 += sx; }
-//        if (e2 < dx) { err += dx; y1 += sy; }
-//    }
-//}
+__device__ void connectVertices(int x1, int y1, int x2, int y2, uchar4* buffer, int width, int height) {
+    int dx = abs(x2 - x1), dy = abs(y2 - y1);
+    int sx = (x1 < x2) ? 1 : -1;
+    int sy = (y1 < y2) ? 1 : -1;
+    int err = dx - dy;
+
+    while (true) {
+        int index = y1 * width + x1;
+        if (index >= 0 && index < width * height)
+            buffer[index] = make_uchar4(255, 255, 255, 255);
+
+        if (x1 == x2 && y1 == y2) break;
+
+        int e2 = 2 * err;
+        if (e2 > -dy) { err -= dy; x1 += sx; }
+        if (e2 < dx) { err += dx; y1 += sy; }
+    }
+}

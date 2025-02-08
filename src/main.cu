@@ -11,6 +11,9 @@ int *d_indices;
 int numTriangles;
 float *depthBuffer;
 
+triangle *d_triangles;
+tile *d_tiles;
+
 int main() {
     GLFWwindow* window = openWindow(width, height, "CUDA OpenGL Interop", NULL);
     if (!window) {
@@ -28,13 +31,16 @@ int main() {
     int numVertices;
     int numIndices;
 
-    if (!LoadModel("objs/sphere.obj", indices, vertices, &numIndices, &numVertices)) {
+    if (!LoadModel("objs/monkey.obj", indices, vertices, &numIndices, &numVertices)) {
         return -1;
     }
     numTriangles = numIndices / 3;
+    cudaMalloc(&d_triangles, numTriangles * sizeof(triangle));
+    cudaMalloc(&d_tiles, ((width * height) / (TILE_SIZE * TILE_SIZE)) * sizeof(tile));
 
     cudaMalloc(&d_vertices, vertices.size() * sizeof(float3));
     cudaMemcpy(d_vertices, vertices.data(), vertices.size() * sizeof(float3), cudaMemcpyHostToDevice);
+    
     cudaMalloc(&d_indices, indices.size() * sizeof(int));
     cudaMemcpy(d_indices, indices.data(), indices.size() * sizeof(int), cudaMemcpyHostToDevice);
     

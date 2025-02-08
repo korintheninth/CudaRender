@@ -6,6 +6,11 @@ extern float3 *d_vertices;
 extern int *d_indices;
 extern int numTriangles;
 extern float *depthBuffer;
+extern float3 *d_screenVertices;
+extern float3 *d_normals;
+
+extern triangle *d_triangles;
+extern tile *d_tiles;
 
 int pboIndex = 0;
 
@@ -17,7 +22,8 @@ void updateBuffer(int width, int height) {
     cudaGraphicsMapResources(1, &cuda_pbo_resource[nextPBO]);
     cudaGraphicsResourceGetMappedPointer((void**)&d_buffer, &buffer_size, cuda_pbo_resource[nextPBO]);
 
-    render(d_buffer, width, height, d_vertices, d_indices, numTriangles, depthBuffer);
+    newRender(d_buffer, width, height, d_vertices, d_indices, numTriangles, depthBuffer, d_triangles, d_tiles);
+
 	
     cudaError_t err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {

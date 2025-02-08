@@ -19,7 +19,7 @@ DEBUGTOTALFLAGS = $(CFLAGS) $(DEBUGFLAGS) $(GLFWFLAGS) $(GLEWFLAGS) $(ASSIMPFLAG
 LIBS = -lcuda -lcudart -lglew32 -lglfw3 -lopengl32 -lgdi32 -luser32 -lshell32 -lassimp
 
 SRCDIR = src
-SRCS = main.cu windowManager.cu renderManager.cu utils.cu render.cu
+SRCS = main.cu windowManager.cu renderManager.cu utils.cu newRender.cu renderUtils.cu
 
 HEADERS = libs/cudarender.h
 
